@@ -1,0 +1,12 @@
+[package]
+name = "poisson_tiles"
+version = "0.1.0"
+authors = ["Wadelma"]
+
+[dependencies]
+poisson = "0.4.0"
+nalgebra = "0.2.17"
+rand = "0.3.8"
+
+[dev-dependencies.image]
+version = "0.3.10"
