@@ -5,8 +5,9 @@ authors = ["Wadelma"]
 
 [dependencies]
 poisson = "0.4.0"
-nalgebra = "0.2.17"
+nalgebra = "0.2.18"
 rand = "0.3.8"
+lazy_static = "0.1.11"
 
 [dev-dependencies.image]
 version = "0.3.10"

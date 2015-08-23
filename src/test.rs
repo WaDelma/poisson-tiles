@@ -12,27 +12,19 @@ use ::PoissonTileSetGen;
 
 use std::hash::SipHasher;
 use std::fs::{self, File};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-#[test]
-fn test_if_it_works() {
-    let poisson = PoissonDisk::<_, Vec2>::with_samples(rand::weak_rng(), 25, 0.8, false);
-    let mut gen = PoissonTileSetGen::new(poisson);
-    let tile_set = gen.create(2, 2);
-    let hasher = SipHasher::new();
-    let mut samples = vec![];
-    let size = 8;
-    for x in -size..size {
-        for y in -size..size {
-            let tile = tile_set.get_tile(&hasher, x, y);
-            samples.extend(new_moved(tile, Vec2::new((size + x) as f64, (size + y) as f64)));
-        }
-    }
-    for s in &mut samples {
-        s.pos = s.pos / (size * 2) as f64;
-    }
-    visualise(&samples, size as u32 * 2, 64, "tiling");
-    // println!("{:?}", tile_set.get_tile(&hasher, 0, 0));
+use self::image::{ImageBuffer, Rgb};
+
+lazy_static! {
+    static ref HOR_COLORS: [Rgb<u8>; 2] = [
+        image::Rgb([0u8, 0u8, 255u8]),
+        image::Rgb([255u8, 255u8, 0u8]),
+    ];
+    static ref VER_COLORS: [Rgb<u8>; 2] = [
+        image::Rgb([255u8, 0u8, 0u8]),
+        image::Rgb([0u8, 255u8, 0u8]),
+    ];
 }
 
 fn new_moved(vecs: &Vec<Sample<Vec2>>, vec: Vec2) -> Vec<Sample<Vec2>> {
