@@ -164,6 +164,7 @@ impl PoissonTileSet {
         }
     }
 
+    //TODO: This breaks on tile corners...
     pub fn find_closest<H: StatelessHasher>(&self, hasher: &H, pnt: Pnt2<f64>) -> (Vec2<f64>, u64, f64, bool) {
         let grid_coord = Pnt2::new(pnt.x.floor(), pnt.y.floor());
         let grid = Pnt2::new(grid_coord.x as i64, grid_coord.y as i64);
@@ -172,22 +173,38 @@ impl PoissonTileSet {
         let x_diff = pnt.x - grid_coord.x;
         // radius * 2 smallest number that is larger than largest empty circle possible
         let largest_empty_circle = self.radius * 2.;
-        if pnt.dist(&(grid_coord + Vec2::new(0., 0.))) <  largest_empty_circle {
+        let largest_empty_circle_sqr = largest_empty_circle.powi(2);
+
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(-1, -1)));
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(-1, 0)));
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(-1, 1)));
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(0, -1)));
+        //
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(0, 1)));
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(1, -1)));
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(1, 0)));
+        // tiles.push(self.get_tile(hasher, grid + Vec2::new(1, 1)));
+
+        if pnt.sqdist(&(grid_coord + Vec2::new(0., 0.))) < largest_empty_circle_sqr {
             tiles.push(self.get_tile(hasher, grid + Vec2::new(-1, 0)));
             tiles.push(self.get_tile(hasher, grid + Vec2::new(0, -1)));
-            // left, bot, this
-        } else if pnt.dist(&(grid_coord + Vec2::new(0., 1.))) <  largest_empty_circle {
+            tiles.push(self.get_tile(hasher, grid + Vec2::new(-1, -1)));
+            // left, bot, letf-bot
+        } else if pnt.sqdist(&(grid_coord + Vec2::new(0., 1.))) < largest_empty_circle_sqr {
             tiles.push(self.get_tile(hasher, grid + Vec2::new(-1, 0)));
             tiles.push(self.get_tile(hasher, grid + Vec2::new(0, 1)));
-            // left, top, this
-        } else if pnt.dist(&(grid_coord + Vec2::new(1., 0.))) <  largest_empty_circle {
+            tiles.push(self.get_tile(hasher, grid + Vec2::new(-1, 1)));
+            // left, top, left-top
+        } else if pnt.sqdist(&(grid_coord + Vec2::new(1., 0.))) < largest_empty_circle_sqr {
             tiles.push(self.get_tile(hasher, grid + Vec2::new(1, 0)));
             tiles.push(self.get_tile(hasher, grid + Vec2::new(0, -1)));
-            // right, bot, this
-        } else if pnt.dist(&(grid_coord + Vec2::new(1., 1.))) <  largest_empty_circle {
+            tiles.push(self.get_tile(hasher, grid + Vec2::new(1, -1)));
+            // right, bot, rigth-bot
+        } else if pnt.sqdist(&(grid_coord + Vec2::new(1., 1.))) < largest_empty_circle_sqr {
             tiles.push(self.get_tile(hasher, grid + Vec2::new(1, 0)));
             tiles.push(self.get_tile(hasher, grid + Vec2::new(0, 1)));
-            // right, top, this
+            tiles.push(self.get_tile(hasher, grid + Vec2::new(1, 1)));
+            // right, top, right-top
         } else if y_diff < largest_empty_circle {
             tiles.push(self.get_tile(hasher, grid + Vec2::new(0, -1)));
             // bot, this
@@ -212,7 +229,7 @@ impl PoissonTileSet {
                 closest = Some(cur);
                 closest_dist = dist;
                 id = hasher.hash((tile.coords, index));
-                if dist < self.radius {
+                if dist <= self.radius {
                     inside = true;
                     break;
                 }
@@ -853,15 +870,39 @@ mod debug {
         //         v = **v / (size * 2) as f64;
         //     }
         // }
+        let side = size as u32 * 2 * 256;
+        let mut imgbuf = image::ImageBuffer::new(side, side);
+        for x in 0..side {
+            for y in 0..side {
+                //TODO: Coordinates are wrong??? Or is the find_closest broken?
+                let xx = x as f64 / (side as f64 / (size * 2) as f64) - size as f64;
+                let yy = y as f64 / (side as f64 / (size * 2) as f64) - size as f64;
+                let (sample, id, dist, inside) = tile_set.find_closest(&hasher, Pnt2::new(xx, yy));
+                let mut col = image::Rgb([(id >> 16 & 0xFF) as u8, (id >> 8  & 0xFF)as u8, (id & 0xFF) as u8]);
+                if inside {
+                    col = image::Rgb([0, 0, 0]);
+                }
+                pixel(&mut imgbuf, side, x as i32, y as i32, col);
+            }
+        }
+        let mut p = PathBuf::new();
+        p.push("visualise");
+        let _ = fs::create_dir(p.clone());
+        p.push("tiling_func");
+        let ref mut fout = File::create(p.with_extension("png")).unwrap();
+        let _ = image::ImageRgb8(imgbuf).save(fout, image::PNG);
 
         draw(&*format!("tiling"), |imgbuf, side| {
             for x in 0..side {
                 for y in 0..side {
                     //TODO: Coordinates are wrong??? Or is the find_closest broken?
-                    let xx = x as f64 / (side as f64 / (size * 2) as f64);
-                    let yy = y as f64 / (side as f64 / (size * 2) as f64);
+                    let xx = x as f64 / (side as f64 / (size * 2) as f64) - size as f64;
+                    let yy = y as f64 / (side as f64 / (size * 2) as f64) - size as f64;
                     let (sample, id, dist, inside) = tile_set.find_closest(&hasher, Pnt2::new(xx, yy));
-                    let col  = image::Rgb([(id >> 16 & 0xFF) as u8, (id >> 8  & 0xFF) as u8, (id & 0xFF) as u8]);
+                    let mut col = image::Rgb([(id >> 16 & 0xFF) as u8, (id >> 8  & 0xFF)as u8, (id & 0xFF) as u8]);
+                    if inside {
+                        col = image::Rgb([0, 0, 0]);
+                    }
                     pixel(imgbuf, side, x as i32, y as i32, col);
                 }
             }
